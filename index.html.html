@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Useless Signal: the most random facts</title>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ---------- Colors live here. Change one, the whole page follows. ---------- */
+  :root {
+    --background: #07030f;
+    --text: #f3eaff;
+    --text-soft: #9a8bb8;
+    --pink: #ff2bd6;
+    --cyan: #19f0ff;
+    --lime: #b8ff3c;
+
+    /* The "accent" changes every time a new fact appears (JS sets it). */
+    --accent: var(--pink);
+
+    color-scheme: dark;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  *, *::before, *::after { box-sizing: inherit; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--text);
+    font-family: "Chakra Petch", system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* ---------- Background layers (they sit behind the content) ---------- */
+  #sparks {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  /* A soft colored light that follows your cursor */
+  #cursor-glow {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--accent) 35%, transparent),
+      transparent 65%);
+  }
+
+  /* ---------- Page content ---------- */
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 28px 18px 60px;
+  }
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: clamp(2rem, 7vw, 3.6rem);
+    line-height: 1;
+    /* Stacked shadows = the neon tube look, plus a pink "glitch" edge */
+    text-shadow: 0 0 8px var(--cyan), 0 0 28px var(--cyan), 3px 0 var(--pink);
+  }
+
+  .intro {
+    margin: 0 0 26px;
+    max-width: 46ch;
+    color: var(--text-soft);
+  }
+
+  /* ---------- Channel buttons ---------- */
+  .channels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .channel {
+    font: inherit;
+    color: var(--text);
+    background: transparent;
+    border: 1.5px solid var(--channel-color);
+    border-radius: 999px;
+    padding: 7px 14px;
+    cursor: pointer;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--channel-color) 50%, transparent);
+    transition: box-shadow 0.2s, background 0.2s;
+  }
+
+  .channel:hover { box-shadow: 0 0 18px var(--channel-color); }
+
+  /* "On" state: filled in with its color */
+  .channel[aria-pressed="true"] {
+    background: var(--channel-color);
+    color: #0a0414;
+    font-weight: 700;
+    box-shadow: 0 0 22px var(--channel-color);
+  }
+
+  /* ---------- The main fact card ---------- */
+  .fact-card {
+    border: 2px solid var(--accent);
+    border-radius: 18px;
+    padding: 30px 24px 24px;
+    min-height: 250px;
+    background: rgba(14, 6, 30, 0.72);
+    backdrop-filter: blur(6px);
+    box-shadow:
+      0 0 14px var(--accent),
+      0 0 60px color-mix(in srgb, var(--accent) 35%, transparent),
+      inset 0 0 30px color-mix(in srgb, var(--accent) 15%, transparent);
+    transition: border-color 0.5s, box-shadow 0.5s;
+  }
+
+  .category {
+    display: inline-block;
+    margin-bottom: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    text-shadow: 0 0 10px var(--accent);
+  }
+
+  #fact-text {
+    margin: 0;
+    max-width: 34ch;
+    min-height: 5.2em; /* keeps the card from jumping while text scrambles */
+    font-size: clamp(1.3rem, 4.4vw, 2rem);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .button {
+    font: inherit;
+    font-weight: 700;
+    color: var(--text);
+    background: transparent;
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 12px 22px;
+    cursor: pointer;
+    box-shadow: 0 0 16px var(--accent);
+    transition: transform 0.12s, box-shadow 0.2s;
+  }
+
+  .button:hover  { box-shadow: 0 0 30px var(--accent); }
+  .button:active { transform: scale(0.95); }
+
+  .button.primary {
+    background: var(--accent);
+    color: #0a0414;
+  }
+
+  /* Visible focus ring for keyboard users */
+  .channel:focus-visible,
+  .button:focus-visible,
+  .saved-item button:focus-visible {
+    outline: 3px solid var(--lime);
+    outline-offset: 3px;
+  }
+
+  .seen-count {
+    margin-left: auto;
+    color: var(--text-soft);
+  }
+
+  .seen-count b {
+    color: var(--lime);
+    text-shadow: 0 0 8px var(--lime);
+  }
+
+  /* Quick brightness pop whenever a new fact lands */
+  .pop { animation: pop 0.35s; }
+
+  @keyframes pop {
+    from { filter: brightness(2.2) hue-rotate(40deg); }
+    to   { filter: none; }
+  }
+
+  /* ---------- Saved list ---------- */
+  .saved-section { margin-top: 28px; }
+
+  .saved-section h2 {
+    margin: 0 0 10px;
+    font-size: 1.1rem;
+    color: var(--lime);
+    text-shadow: 0 0 8px var(--lime);
+  }
+
+  #saved-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .saved-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(14, 6, 30, 0.6);
+    border-left: 3px solid var(--channel-color);
+    border-radius: 0 10px 10px 0;
+  }
+
+  .saved-item button {
+    padding: 2px 6px;
+    font: inherit;
+    color: var(--text-soft);
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .empty-note { color: var(--text-soft); }
+
+  /* People who prefer less motion get a calmer page */
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+    .pop { animation: none; }
+  }
+</style>
+</head>
+
+<body>
+  <canvas id="sparks" aria-hidden="true"></canvas>
+  <div id="cursor-glow" aria-hidden="true"></div>
+
+  <main>
+    <h1>Useless Signal</h1>
+    <p class="intro">Tune into the most random, true facts on the planet. Pick a channel or just hit the button.</p>
+
+    <!-- Channel buttons get created by JavaScript below -->
+    <div class="channels" id="channels" role="group" aria-label="Channels"></div>
+
+    <section class="fact-card" id="fact-card" aria-live="polite">
+      <span class="category" id="category">Ready</span>
+      <p id="fact-text">Press the button to pull a fact out of the noise.</p>
+
+      <div class="card-actions">
+        <button class="button primary" id="next-button">Next fact</button>
+        <button class="button" id="save-button">Save it</button>
+        <span class="seen-count">Facts seen: <b id="seen-count">0</b></span>
+      </div>
+    </section>
+
+    <section class="saved-section">
+      <h2>Saved signals</h2>
+      <ul id="saved-list"></ul>
+    </section>
+  </main>
+
+<script>
+  // ============================================================
+  //  1. THE DATA: channels (with their colors) and the facts
+  // ============================================================
+
+  const channelColors = {
+    Animals: '#ff2bd6',
+    Space:   '#19f0ff',
+    History: '#b8ff3c',
+    Tech:    '#8a5cff',
+    Earth:   '#ff9f1c',
+    Weird:   '#ff4d6d',
+  };
+
+  // Want more facts? Add a line here: { channel: 'Space', text: 'Your fact.' }
+  const facts = [
+    { channel: 'Animals', text: 'Octopuses have three hearts, and two of them stop beating when they swim.' },
+    { channel: 'Animals', text: 'Wombat poop is cube-shaped, which stops it from rolling away.' },
+    { channel: 'Animals', text: 'Sea otters hold hands while they sleep so they do not drift apart.' },
+    { channel: 'Animals', text: 'A shrimp has its heart in its head.' },
+    { channel: 'Animals', text: 'Crows can recognize individual human faces and remember who was rude.' },
+    { channel: 'Animals', text: 'Mantis shrimp have up to 16 types of color receptors. Humans have 3.' },
+    { channel: 'Space',   text: 'A day on Venus is longer than a year on Venus.' },
+    { channel: 'Space',   text: 'A teaspoon of neutron star would weigh about a billion tons.' },
+    { channel: 'Space',   text: 'Lightning can be about five times hotter than the surface of the Sun.' },
+    { channel: 'Space',   text: 'There are more possible chess games than atoms in the observable universe.' },
+    { channel: 'History', text: 'Oxford University is older than the Aztec Empire.' },
+    { channel: 'History', text: 'Cleopatra lived closer in time to the Moon landing than to the building of the Great Pyramid.' },
+    { channel: 'History', text: 'Nintendo was founded in 1889 as a playing card company.' },
+    { channel: 'History', text: 'Sharks are older than trees.' },
+    { channel: 'Tech',    text: 'The first computer "bug" was a real moth stuck in a Harvard Mark II relay in 1947.' },
+    { channel: 'Tech',    text: 'Sound travels about four times faster in water than in air.' },
+    { channel: 'Tech',    text: 'The Eiffel Tower grows up to 15 centimeters taller in hot summer weather.' },
+    { channel: 'Earth',   text: 'Antarctica is the largest desert on Earth.' },
+    { channel: 'Earth',   text: 'Lake Hillier in Australia is naturally bubblegum pink.' },
+    { channel: 'Earth',   text: 'Russia spans eleven time zones.' },
+    { channel: 'Earth',   text: 'A normal fluffy cloud can weigh around half a million kilograms.' },
+    { channel: 'Weird',   text: 'Honey found in ancient Egyptian tombs was still edible.' },
+    { channel: 'Weird',   text: 'Bananas are berries, but strawberries are not.' },
+    { channel: 'Weird',   text: 'A group of flamingos is called a flamboyance.' },
+    { channel: 'Weird',   text: "Scotland's national animal is the unicorn." },
+  ];
+
+  // ============================================================
+  //  2. THE STATE: things that change while you use the page
+  // ============================================================
+
+  let currentFact = null;
+  let currentIndex = -1;                 // so we never show the same fact twice in a row
+  let seenCount = 0;
+  let savedFacts = [];
+  let scrambleTimer = null;
+  const activeChannels = new Set(Object.keys(channelColors));   // all on at the start
+
+  const userWantsLessMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Short helper so we don't type document.getElementById forty times
+  const byId = (id) => document.getElementById(id);
+
+  // ============================================================
+  //  3. CHANNEL BUTTONS
+  // ============================================================
+
+  function buildChannelButtons() {
+    const container = byId('channels');
+
+    for (const [name, color] of Object.entries(channelColors)) {
+      const button = document.createElement('button');
+      button.className = 'channel';
+      button.textContent = name;
+      button.style.setProperty('--channel-color', color);
+      button.setAttribute('aria-pressed', 'true');
+
+      button.addEventListener('click', () => {
+        if (activeChannels.has(name)) {
+          // Always keep at least one channel on, or there'd be nothing to show
+          if (activeChannels.size > 1) activeChannels.delete(name);
+        } else {
+          activeChannels.add(name);
+        }
+        button.setAttribute('aria-pressed', activeChannels.has(name));
+      });
+
+      container.appendChild(button);
+    }
+  }
+
+  // ============================================================
+  //  4. SHOWING A FACT
+  // ============================================================
+
+  const glitchCharacters = '#$%&*+<>?/\\|=~01';
+
+  // Types the fact out by turning random symbols into the real letters, left to right
+  function revealWithScramble(finalText) {
+    clearInterval(scrambleTimer);
+    const textElement = byId('fact-text');
+
+    if (userWantsLessMotion) {
+      textElement.textContent = finalText;
+      return;
+    }
+
+    let revealedLetters = 0;
+
+    scrambleTimer = setInterval(() => {
+      revealedLetters += 2;
+
+      textElement.textContent = finalText
+        .split('')
+        .map((letter, position) => {
+          if (letter === ' ') return ' ';
+          if (position < revealedLetters) return letter;
+          return glitchCharacters[Math.floor(Math.random() * glitchCharacters.length)];
+        })
+        .join('');
+
+      if (revealedLetters >= finalText.length) {
+        clearInterval(scrambleTimer);
+        textElement.textContent = finalText;
+      }
+    }, 22);
+  }
+
+  function showNextFact() {
+    // Which facts are allowed right now? (channel is on, and it isn't the one we just showed)
+    const allowedIndexes = facts
+      .map((fact, index) => index)
+      .filter((index) => activeChannels.has(facts[index].channel) && index !== currentIndex);
+
+    if (allowedIndexes.length === 0) return;
+
+    currentIndex = allowedIndexes[Math.floor(Math.random() * allowedIndexes.length)];
+    currentFact = facts[currentIndex];
+    seenCount++;
+
+    const color = channelColors[currentFact.channel];
+    document.documentElement.style.setProperty('--accent', color);
+
+    byId('category').textContent = currentFact.channel;
+    byId('seen-count').textContent = seenCount;
+    byId('save-button').textContent = 'Save it';
+
+    // Restart the little brightness "pop" animation
+    const card = byId('fact-card');
+    card.classList.remove('pop');
+    void card.offsetWidth;            // forces the browser to reset the animation
+    card.classList.add('pop');
+
+    revealWithScramble(currentFact.text);
+    spawnBurst(innerWidth / 2, innerHeight / 2, color);
+  }
+
+  // ============================================================
+  //  5. SAVED FACTS
+  // ============================================================
+
+  function renderSavedList() {
+    const list = byId('saved-list');
+    list.innerHTML = '';
+
+    if (savedFacts.length === 0) {
+      const note = document.createElement('li');
+      note.className = 'empty-note';
+      note.textContent = 'Nothing saved yet. Hit "Save it" on a fact you like.';
+      list.appendChild(note);
+      return;
+    }
+
+    savedFacts.forEach((fact, position) => {
+      const item = document.createElement('li');
+      item.className = 'saved-item';
+      item.style.setProperty('--channel-color', channelColors[fact.channel]);
+
+      const text = document.createElement('span');
+      text.textContent = fact.text;
+
+      const removeButton = document.createElement('button');
+      removeButton.textContent = 'Remove';
+      removeButton.setAttribute('aria-label', 'Remove saved fact');
+      removeButton.addEventListener('click', () => {
+        savedFacts.splice(position, 1);
+        renderSavedList();
+      });
+
+      item.append(text, removeButton);
+      list.appendChild(item);
+    });
+  }
+
+  function saveCurrentFact() {
+    if (!currentFact || savedFacts.includes(currentFact)) return;
+    savedFacts.unshift(currentFact);      // newest on top
+    renderSavedList();
+    byId('save-button').textContent = 'Saved';
+  }
+
+  // ============================================================
+  //  6. THE NEON BACKGROUND (drifting dots + click bursts)
+  // ============================================================
+
+  const canvas = byId('sparks');
+  const ctx = canvas.getContext('2d');
+  const glow = byId('cursor-glow');
+  const neonPalette = Object.values(channelColors);
+
+  let width, height;
+  let dots = [];
+  let burstParticles = [];
+  let mouseX = innerWidth / 2;
+  let mouseY = innerHeight / 2;
+
+  function setupCanvas() {
+    width = canvas.width = innerWidth;
+    height = canvas.height = innerHeight;
+
+    // More screen space = more dots, capped so phones stay smooth
+    const dotCount = Math.min(90, Math.floor((width * height) / 14000));
+
+    dots = Array.from({ length: dotCount }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      speedX: (Math.random() - 0.5) * 0.5,
+      speedY: (Math.random() - 0.5) * 0.5,
+      color: neonPalette[Math.floor(Math.random() * neonPalette.length)],
+    }));
+  }
+
+  // A little firework of squares
+  function spawnBurst(x, y, color) {
+    for (let i = 0; i < 26; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * 4;
+      burstParticles.push({
+        x, y, color,
+        speedX: Math.cos(angle) * speed,
+        speedY: Math.sin(angle) * speed,
+        life: 1,
+      });
+    }
+  }
+
+  function drawFrame() {
+    // Painting a see-through dark layer (instead of clearing) leaves short glowing trails
+    ctx.fillStyle = 'rgba(7, 3, 15, 0.28)';
+    ctx.fillRect(0, 0, width, height);
+
+    for (const dot of dots) {
+      dot.x += dot.speedX;
+      dot.y += dot.speedY;
+
+      // Bounce off the edges
+      if (dot.x < 0 || dot.x > width)  dot.speedX *= -1;
+      if (dot.y < 0 || dot.y > height) dot.speedY *= -1;
+
+      // Dots near the cursor get a line to it, and are nudged gently away
+      const distance = Math.hypot(dot.x - mouseX, dot.y - mouseY);
+      if (distance < 160) {
+        ctx.globalAlpha = 1 - distance / 160;
+        ctx.strokeStyle = dot.color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(dot.x, dot.y);
+        ctx.lineTo(mouseX, mouseY);
+        ctx.stroke();
+
+        dot.x += (dot.x - mouseX) * 0.006;
+        dot.y += (dot.y - mouseY) * 0.006;
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = dot.color;
+      ctx.shadowColor = dot.color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.shadowBlur = 0;
+
+    // Loop backwards so removing a particle doesn't skip the next one
+    for (let i = burstParticles.length - 1; i >= 0; i--) {
+      const p = burstParticles[i];
+      p.x += p.speedX;
+      p.y += p.speedY;
+      p.speedX *= 0.97;     // slow down a bit each frame
+      p.speedY *= 0.97;
+      p.life -= 0.02;
+
+      if (p.life <= 0) {
+        burstParticles.splice(i, 1);
+        continue;
+      }
+
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, 3, 3);
+    }
+
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(drawFrame);
+  }
+
+  // ============================================================
+  //  7. WIRING IT ALL UP
+  // ============================================================
+
+  byId('next-button').addEventListener('click', showNextFact);
+  byId('save-button').addEventListener('click', saveCurrentFact);
+
+  // Spacebar = next fact (only when you're not focused on a button)
+  addEventListener('keydown', (event) => {
+    if (event.code === 'Space' && event.target === document.body) {
+      event.preventDefault();
+      showNextFact();
+    }
+  });
+
+  addEventListener('pointermove', (event) => {
+    mouseX = event.clientX;
+    mouseY = event.clientY;
+    glow.style.left = mouseX + 'px';
+    glow.style.top = mouseY + 'px';
+  });
+
+  addEventListener('pointerdown', (event) => {
+    const randomColor = neonPalette[Math.floor(Math.random() * neonPalette.length)];
+    spawnBurst(event.clientX, event.clientY, randomColor);
+  });
+
+  addEventListener('resize', setupCanvas);
+
+  // Go!
+  buildChannelButtons();
+  renderSavedList();
+  setupCanvas();
+
+  if (userWantsLessMotion) {
+    ctx.fillStyle = '#07030f';
+    ctx.fillRect(0, 0, width, height);
+  } else {
+    drawFrame();
+  }
+</script>
+</body>
+</html>
